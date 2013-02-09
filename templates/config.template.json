@@ -1,0 +1,12 @@
+{
+	"global" : {
+		"buildType" : "@buildType@",
+		"frameRate" : 66,
+		"assetLoader" :	{ 
+			"baseDir" : "assets/@buildType@"
+		}
+	},
+	"color" : {
+	 	"circle" : "0x0FFFF0"
+	}
+}

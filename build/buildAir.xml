@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project name="[swarmFlow] buildAir" basedir="../" default="debug">
+
+    <!-- PROPERTIES -->
+    <property name="BUILD_TYPE" value="air"/>
+    <property name="BUILD_DIR" value="${basedir}/build"/>
+    <property file="${BUILD_DIR}/${user.name}.properties"/>
+    <property file="${BUILD_DIR}/build.properties"/>
+
+    <target name="publish">
+        <antcall target="-package">
+            <param name="param.target" value="air"/>
+        </antcall>
+    </target>
+
+    <target name="bundle">
+        <antcall target="-package">
+            <param name="param.target" value="bundle"/>
+        </antcall>
+    </target>
+
+    <target name="debug">
+        <antcall target="-build">
+            <param name="param.debug" value="true"/>
+            <param name="param.buildType" value="${BUILD_TYPE}"/>
+        </antcall>
+    </target>
+
+    <target name="launch">
+        <exec executable="${adl}">
+            <arg value="${TMP_DIR}/${air.config}.xml"/>
+            <arg value="${TMP_DIR}"/>
+        </exec>
+    </target>
+
+    <target name="-clean">
+        <delete dir="${TMP_DIR}" includeemptydirs="true" verbose="true"/>
+    </target>
+
+    <target name="-build" depends="-clean,-fetch_swc,-copyTemplates">
+        <java jar="${mxmlc}" dir="${FLEX_HOME}/frameworks" fork="true" failonerror="true">
+            <arg value="${SOURCE_DIR}/${swf.src}"/>
+            <arg value="-output=${TMP_DIR}/${swf.name}"/>
+            <arg value="-source-path=${SOURCE_DIR}"/>
+            <arg value="-library-path+=${LIBS_LOC}"/>
+
+
+            <arg value="-default-size=${BUILD_WIDTH},${BUILD_HEIGHT}"/>
+
+            <arg value="-target-player=${PLAYER_VERSION}"/>
+            <arg value="-swf-version=${SWF_VERSION}"/>
+
+            <arg value="-keep-as3-metadata+=Inject"/>
+            <arg value="-keep-as3-metadata+=PostConstruct"/>
+            <arg value="-define=CONFIG::debug,${param.debug}"/>
+
+            <arg value="-debug=${param.debug}"/>
+            <arg value="-incremental=false"/>
+            <arg value="-static-link-runtime-shared-libraries=true"/>
+            <arg value="-verbose-stacktraces=false"/>
+            <arg value="-headless-server=false"/>
+            <arg value="-load-config+=air-config.xml" />
+        </java>
+    </target>
+
+    <target name="-package">
+        <antcall target="-build">
+            <param name="param.debug" value="false"/>
+            <param name="param.buildType" value="${BUILD_TYPE}"/>
+        </antcall>
+
+        <mkdir dir="${air.dir}"/>
+
+        <delete failOnError="false" includeEmptyDirs="true">
+            <fileset dir="${air.dir}">
+                <include name="*.${param.target}"/>
+            </fileset>
+        </delete>
+
+        <exec executable="${FLEX_HOME}/bin/adt.bat" failonerror="true">
+            <arg line="-package"/>
+            <arg line="-storetype pkcs12"/>
+            <arg line="-keystore ${air.key}"/>
+            <arg line="-storepass ${air.pass}"/>
+            <arg line="-tsa none"/>
+            <arg line="-target ${param.target}"/>
+            <arg line="${air.dir}/${air.name}.${param.target}"/>
+            <arg line="${TMP_DIR}/${air.config}.xml"/>
+            <arg line="-C ${TMP_DIR} ${swf.name}"/>
+            <arg line="-C ${ASSET_OUTPUT_DIR}/${BUILD_TYPE} assets"/>
+        </exec>
+    </target>
+
+    <target name="-copyTemplates">
+        <copy file="${TEMPLATE_DIR}/app.template.xml" tofile="${TMP_DIR}/${air.config}.xml" overwrite="true">
+            <filterset begintoken="@" endtoken="@">
+                <filter token="width" value="${BUILD_WIDTH}"/>
+                <filter token="height" value="${BUILD_HEIGHT}"/>
+                <filter token="version" value="${GAME_VERSION}"/>
+                <filter token="name" value="${air.name}.air"/>
+                <filter token="swf" value="${swf.name}"/>
+                <filter token="id" value="${air.id}"/>
+                <filter token="sdk" value="${AIR_SDK_VERSION}"/>
+            </filterset>
+        </copy>
+        <copy file="${TEMPLATE_DIR}/config.template.json" tofile="${TMP_DIR}/config.json" overwrite="true">
+            <filterset begintoken="@" endtoken="@">
+                <filter token="buildType" value="${BUILD_TYPE}"/>
+            </filterset>
+        </copy>
+    </target>
+
+    <target name="-fetch_swc">
+        <!-- Copying new swc -->
+        <copy todir="${LIBS_LOC}" failonerror="true" overwrite="true">
+            <fileset dir="${basedir}/${SOL_LIBRARIES_HOME}/bin">
+                <include name="*.swc"/>
+            </fileset>
+        </copy>
+    </target>
+
+</project>

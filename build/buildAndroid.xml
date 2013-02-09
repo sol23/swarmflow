@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="[swarmFlow] buildAndroid" basedir="../" default="install_debug">
+	
+	<!-- PROJECT SETTINGS -->
+    <property name="BUILD_TYPE" value="nexus7"/>
+    <property name="BUILD_DIR" value="${basedir}/build"/>
+	<property file="${BUILD_DIR}/${user.name}.properties" />
+	<property file="${BUILD_DIR}/build.properties" />
+
+	<target name="-package">
+        <mkdir dir="${android.dir}" />
+		<delete failOnError="false" includeEmptyDirs="true">
+			<fileset dir="${android.dir}" includes="*.apk" />
+		</delete>
+				
+		<condition property="listen" value="-connect" else="">
+			<equals arg1="${apk.target}" arg2="apk-debug" />
+		</condition>
+
+        <!--condition property="port" value="localhost" else="">
+            <equals arg1="${apk.target}" arg2="apk-debug" />
+        </condition-->
+				
+		<java jar="${adt}" fork="true" failonerror="true">
+			<arg value="-package" />
+			<arg value="-target" />
+			<!-- Include Debugging Information -->
+			<arg value="${apk.target}" />
+			<arg value="${listen}" />
+			<!-- NATIVE_SIGNING_OPTIONS -->
+			<arg value="-storetype" />
+			<arg value="pkcs12" />
+			<arg value="-keystore" />
+			<arg value="${android.key}" />
+			<arg value="-storepass" />
+			<arg value="${android.pass}" />
+			<!-- Name Of File To Create-->
+			<arg value="${android.dir}/${android.name}_${BUILD_TYPE}.apk" />
+			<!-- App Descriptor-->
+			<arg value="${TMP_DIR}/${android.config}.xml" />
+			<!-- Files To Package -->
+			<arg value="-C" />
+			<arg value="${TMP_DIR}" />
+			<arg value="${swf.name}" />	
+			<arg value="-C" />			
+			<arg value="${TMP_DIR}" />
+			<arg value="config.json" />			
+			<arg value="-C" />
+			<arg value="${ASSET_OUTPUT_DIR}/${BUILD_TYPE}" />
+			<arg value="assets" />					
+			<!-- add more assets here -->
+		</java>
+	</target>
+
+	<!--
+	
+	
+		Android Dev Targets
+	
+	
+	-->
+	
+	<target name="-get_devices">
+		<exec executable="${adb}">
+			<arg line="devices"/>
+		</exec>
+		<echo>If no devices are listed you first need to start an emulator in the AVD Manager</echo>
+		<echo>or connect your android device.</echo>
+		<echo>Make sure that USB debugging is enabled on your device.</echo>
+	</target>
+	
+	<target name="-get_targets">
+		<exec executable="${ANDROID_HOME}/tools/android.bat">
+			<arg line="list"/>
+			<arg line="targets"/>
+		</exec>
+		<echo>If no targets are listed you first need to run 'start_up_manager' and download some platforms</echo>
+	</target>
+	
+	<target name="-get_avds">
+		<exec executable="${ANDROID_HOME}/tools/android.bat">
+			<arg line="list"/>
+			<arg line="avds"/>
+		</exec>
+		<echo>If no AVDs are listed you first need to run 'startup_manager' and create an android virtual device.</echo>
+	</target>
+	
+	<target name="startup_manager"
+		description="Starts up the Android Dev Manager.">
+		<exec executable="${ANDROID_HOME}/tools/android.bat"/>
+	</target>
+	
+	<!--
+	
+	
+		Install Targets
+	
+	
+	-->
+	
+	<target name="install_air_on_emulator"
+		description="Installs the air runtime on the emulator.">
+		<exec executable="${adb}">
+			<arg line="install"/>
+			<arg line="-r"/>
+			<arg line="'${FLEX_HOME}/runtimes/air/android/emulator/Runtime.apk'"/>
+		</exec>
+	</target>
+	
+	<target name="install_air_on_device"
+		description="Installs the air runtime on the device.">
+		<exec executable="${adb}">
+			<arg line="install"/>
+			<arg line="-r"/>
+			<arg line="'${FLEX_HOME}/runtimes/air/android/device/Runtime.apk'"/>
+		</exec>
+	</target>
+	
+	<!--
+	
+	
+		Debug Targets
+	
+	
+	-->
+	<target name="install_debug" description="Install Debug on Device/Emulator">
+		<echo>${FLEX_HOME}</echo>
+		<property name="apk.target" value="apk-debug"/>
+        <ant antfile="${BUILD_DIR}/buildAir.xml" target="-build">
+			<property name="param.debug" value="true"/>
+			<property name="param.buildType" value="${BUILD_TYPE}" />
+		</ant>
+		<antcall target="-copyTemplates" />
+		<antcall target="-package" />
+		<antcall target="-get_devices"/>
+		
+		<java jar="${adt}" fork="true">
+			<arg value="-uninstallApp" />
+			<arg value="-platform" />
+			<arg value="android" />
+			<arg value="-appid" />
+			<arg value="${android.id}" />
+		</java>		
+		
+		<java jar="${adt}" fork="true">
+			<arg value="-installApp" />
+			<arg value="-platform" />
+			<arg value="android" />
+			<arg value="-package" />
+			<arg value="${android.dir}/${android.name}_${BUILD_TYPE}.apk" />
+		</java>
+		
+		<java jar="${adt}" fork="true">
+			<arg value="-launchApp" />
+			<arg value="-platform" />
+			<arg value="android" />
+			<arg value="-appid" />
+			<arg value="${android.id}" />
+		</java>				
+				
+		<exec executable="${adb}">
+			<arg line="forward" />
+			<arg line="tcp:7936"/>
+			<arg line="tcp:7936"/>
+		</exec>
+	</target>
+	
+	<!--
+	
+	
+		Install App Targets
+	
+	
+	-->
+	
+	<target name="install_app_on_emulator"
+		description="Installs the application on the emulator.">
+		<property name="apk.target" value="apk-emulator"/>
+		<antcall target="-install_app_on">
+			<param name="target.install" value="e"/>
+		</antcall>
+	</target>
+	
+	<target name="install_app_on_device"
+		description="Installs the application on the device.">
+		<property name="apk.target" value="apk"/>
+		<antcall target="-install_app_on">
+			<param name="target.install" value="d"/>
+		</antcall>
+	</target>
+	
+	<target name="-install_app_on">
+        <ant antfile="${BUILD_DIR}/buildAir.xml" target="-build">
+			<property name="param.debug" value="false"/>
+			<property name="param.buildType" value="${BUILD_TYPE}" />
+		</ant>
+        <antcall target="-copyTemplates" />
+		<antcall target="-package"/>
+		<antcall target="-get_devices"/>
+		<exec executable="${adb}">
+			<arg line="-${target.install}"/>
+			<arg line="install"/>
+			<arg line="-r"/>
+			<arg line="${android.dir}/${android.name}_${BUILD_TYPE}.apk"/>
+		</exec>
+	</target>
+	
+	<target name="-copyTemplates">
+		<copy file="${TEMPLATE_DIR}/app.template.xml" tofile="${TMP_DIR}/${android.config}.xml" overwrite="true">
+			<filterset begintoken="@" endtoken="@">
+				<filter token="width" value="${BUILD_WIDTH}" />
+				<filter token="height" value="${BUILD_HEIGHT}" />			
+				<filter token="version" value="${GAME_VERSION}" />
+				<filter token="name" value="${android.name}" />
+				<filter token="id" value="${android.id}" />
+				<filter token="swf" value="${swf.name}" />
+				<filter token="sdk" value="${AIR_SDK_VERSION}" />
+			</filterset>
+		</copy>
+		<copy file="${TEMPLATE_DIR}/config.template.json" tofile="${TMP_DIR}/config.json" overwrite="true">
+			<filterset begintoken="@" endtoken="@">
+				<filter token="buildType" value="${BUILD_TYPE}"/>			
+			</filterset>
+		</copy>		
+	</target>
+</project>
